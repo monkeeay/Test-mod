@@ -1,0 +1,99 @@
+apply plugin: "java"
+
+version '1.0'
+
+sourceSets.main.java.srcDirs = ["src"]
+
+repositories{
+    mavenCentral()
+    maven{ url "https://raw.githubusercontent.com/Zelaux/MindustryRepo/master/repository" }
+    maven{ url 'https://www.jitpack.io' }
+}
+
+ext{
+    mindustryVersion = 'v146'
+    isWindows = System.getProperty("os.name").toLowerCase().contains("windows")
+    sdkRoot = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+}
+
+allprojects{
+    tasks.withType(JavaCompile){
+        options.encoding = 'UTF-8' 
+        options.compilerArgs.addAll([
+            '--source', '8', 
+            '--target', '8'
+        ])
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies{
+    // Temporarily changed to implementation for debugging classpath issues
+    implementation "com.github.Anuken.Arc:arc-core:$mindustryVersion"
+    implementation "com.github.Anuken.Mindustry:core:$mindustryVersion"
+}
+
+configurations.all{
+    resolutionStrategy.eachDependency { details ->
+        if(details.requested.group == 'com.github.Anuken.Arc'){
+            details.useVersion "$mindustryVersion"
+        }
+    }
+}
+
+task jarAndroid{
+    dependsOn "jar"
+    doLast{
+        if(!sdkRoot || !new File(sdkRoot).exists()) throw new GradleException("No valid Android SDK found. Ensure that ANDROID_HOME is set to your Android SDK directory.");
+        def platformRoot = new File("$sdkRoot/platforms/").listFiles().sort().reverse().find{ f -> new File(f, "android.jar").exists()}
+        if(!platformRoot) throw new GradleException("No android.jar found. Ensure that you have an Android platform installed.")
+        
+        def dependenciesList = (configurations.compileClasspath.asList() + configurations.runtimeClasspath.asList() + [new File(platformRoot, "android.jar")])
+        def validDependencies = dependenciesList.findAll { it != null && new File(it.toString()).exists() }
+        def dependencies = validDependencies.collect{ "--classpath '${it.path}'" }.join(" ")
+
+        def d8ToolDir = new File(sdkRoot, "build-tools").listFiles()?.sort{a, b -> b.name <=> a.name}?.find{ dir -> new File(dir, isWindows ? "d8.bat" : "d8").exists() }
+        if(!d8ToolDir) throw new GradleException("d8 tool not found in any build-tools version. Ensure that you have Android build-tools installed via SDK manager (try API 30 or 31 for d8).")
+        def d8 = new File(d8ToolDir, isWindows ? "d8.bat" : "d8").absolutePath
+        
+        def outputDir = new File("$buildDir/libs")
+        if (!outputDir.exists()) { outputDir.mkdirs() }
+
+        def desktopJarPath = "${outputDir.absolutePath}/${project.archivesBaseName}Desktop.jar"
+        def androidJarPath = "${outputDir.absolutePath}/${project.archivesBaseName}Android.jar"
+        if (!new File(desktopJarPath).exists()) {
+            throw new GradleException("Desktop JAR not found for D8 processing: $desktopJarPath. Ensure 'jar' task runs correctly and produces this file.")
+        }
+
+        def command = ["'$d8'", dependencies, "--min-api", "21", "--output", "'$androidJarPath'", "'$desktopJarPath'"].join(" ")
+        
+        println "Executing D8 command: " + command
+        def process = command.execute(null, project.projectDir)
+        process.waitForProcessOutput(System.out, System.err)
+        if(process.exitValue() != 0) {
+            throw new GradleException("D8 tool failed. Exit value: " + process.exitValue() + ". Check D8 command and SDK setup.")
+        }
+    }
+}
+
+jar{
+    archiveFileName = "${project.archivesBaseName}Desktop.jar" 
+    from{ configurations.runtimeClasspath.collect{ it.isDirectory() ? it : zipTree(it) } }
+    from(projectDir){ include "mod.hjson" }
+    from("assets/") { include "**" } 
+}
+
+task deploy(type: Jar){
+    dependsOn jarAndroid
+    archiveFileName = "${project.archivesBaseName}.jar"
+    from{ [zipTree("$buildDir/libs/${project.archivesBaseName}Desktop.jar"), zipTree("$buildDir/libs/${project.archivesBaseName}Android.jar")] }
+    doLast{
+        delete{
+            delete "$buildDir/libs/${project.archivesBaseName}Desktop.jar"
+            delete "$buildDir/libs/${project.archivesBaseName}Android.jar"
+        }
+    }
+}
+
+build.dependsOn deploy
