@@ -1,0 +1,29 @@
+{
+  # The internal name of your mod. IMPORTANT: Once you choose a name, do NOT change it.
+  # This should only contain characters a-z, 0-9, or '-'. No spaces or other special characters.
+  name: "my-example-mod"
+
+  # The display name of your mod, as it appears in the mod list.
+  displayName: "My Example Mod"
+
+  # Your name.
+  author: "YourName"
+
+  # The main class of your mod. This is the class that extends Mod.
+  # If your main class is in a package, include it here.
+  main: "com.example.mod.MyExampleMod"
+
+  # The description of your mod.
+  description: "A simple example mod for Mindustry."
+
+  # The version of your mod.
+  version: "1.0"
+
+  # The minimum game build required to run your mod.
+  # "105" is version 5.0, "106" is version 6.0, etc.
+  # Mindustry v146 is the latest stable as of writing this template
+  minGameVersion: "146"
+
+  # Whether this mod is hidden from the mod browser.
+  hidden: false
+}
