@@ -12,6 +12,7 @@ repositories{
 
 ext{
     mindustryVersion = 'v149' // Updated to v149
+
     isWindows = System.getProperty("os.name").toLowerCase().contains("windows")
     sdkRoot = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
 }
@@ -32,6 +33,7 @@ dependencies{
     // Changed back to compileOnly, which is standard for Mindustry mods
     compileOnly "com.github.Anuken.Arc:arc-core:$mindustryVersion"
     compileOnly "com.github.Anuken.Mindustry:core:$mindustryVersion"
+
 }
 
 configurations.all{
